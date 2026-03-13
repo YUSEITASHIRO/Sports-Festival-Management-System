@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>イベント費用計算ツール</title>
+    <style>
+        :root {
+            --color-both: #e0f7fa; --border-both: #4dd0e1;
+            --color-sports: #e8f5e9; --border-sports: #81c784;
+            --color-festival: #fff3e0; --border-festival: #ffb74d;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; background: linear-gradient(135deg, #6a85b6 0%, #bac8e0 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 95%; width: 1000px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2.5em; background: linear-gradient(135deg, #6a85b6, #8a7c9e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .grid-container { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .controls, .costs, .counters, .additional-tshirts { margin-bottom: 20px; padding: 20px; background: #f5f7fa; border-radius: 15px; }
+        .controls { grid-column: 1 / -1; }
+        .counters h3, .additional-tshirts h3 { margin-top: 0; margin-bottom: 15px; text-align: center; }
+        .counter-display { display: flex; justify-content: space-around; font-size: 1.2em; text-align: center; }
+        .counter-item strong { display: block; font-size: 1.8em; color: #6a85b6; }
+        .control-group { display: flex; flex-direction: column; margin-bottom: 15px; }
+        .control-group label { margin-bottom: 8px; font-weight: 600; color: #555; }
+        .control-group input { padding: 10px; border: 1px solid #ccc; border-radius: 8px; }
+        .cost-item .control-group { display: grid; grid-template-columns: 1fr 2fr; align-items: center; gap: 10px; margin-bottom: 8px; }
+        .cost-item .control-group.total { font-weight: bold; }
+        .cost-item fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 10px; }
+        .cost-item fieldset[disabled] { background-color: #f0f0f0; opacity: 0.7; }
+        .toggle-label { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+        .button-group { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin: 25px 0; }
+        button { padding: 12px 25px; border: none; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        .btn-primary { background: linear-gradient(135deg, #6a85b6, #8a7c9e); color: white; }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(106, 133, 182, 0.4); }
+        .btn-secondary { background: linear-gradient(135deg, #cfd9df, #e2ebf0); color: #333; }
+        .btn-small { padding: 4px 10px; font-size: 12px; border-radius: 15px; }
+        .additional-tshirts-list > div { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+        .additional-tshirts-list input { padding: 8px; }
+        .additional-tshirts-list input[type="text"] { flex-grow: 1; }
+        .additional-tshirts-list input[type="number"] { width: 70px; }
+        .member-list-container, #results, #profit-container { margin-top: 20px; }
+        /* (省略) 以前のバージョンと同じスタイル */
+        .member-list-container { background: #f8f9fa; padding: 20px; border-radius: 12px; }
+        .member-list-container h3 { text-align: center; margin-bottom: 15px; font-size: 1.5em; }
+        .members { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }
+        .member { display: flex; align-items: center; gap: 10px; padding: 10px; border: 1px solid #dee2e6; border-radius: 8px; background: white; user-select: none; }
+        .member-name { font-weight: 600; flex-grow: 1; }
+        .tag { font-size: 12px; padding: 3px 8px; border-radius: 12px; border: 1px solid; white-space: nowrap; }
+        .tag-both { background-color: var(--color-both); border-color: var(--border-both); }
+        .tag-sports { background-color: var(--color-sports); border-color: var(--border-sports); }
+        .tag-festival { background-color: var(--color-festival); border-color: var(--border-festival); }
+        .results-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        .result-box { background: #f8f9fa; padding: 20px; border-radius: 12px; }
+        .result-box h3 { border-bottom: 2px solid #6a85b6; padding-bottom: 10px; margin-bottom: 15px; }
+        .result-box ul { list-style: none; padding: 0; }
+        .result-box li { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #eee; flex-wrap: wrap; }
+        .result-box li:last-child { border-bottom: none; }
+        .result-box .charge-input { width: 100px; text-align: right; padding: 5px; border-radius: 5px; border: 1px solid #ccc; font-size: 1em; font-weight: bold; color: #d32f2f; }
+        .result-box .names { text-align: right; color: #555; margin-left: 10px; flex-basis: 100%; font-size: 0.9em; margin-top: 5px; }
+        #profit-container { padding: 20px; border-radius: 12px; text-align: center; }
+        .profit { background-color: #d4edda; color: #155724; }
+        .loss { background-color: #f8d7da; color: #721c24; }
+        .message-box { min-height: 50px; }
+        .success, .error { padding: 15px; border-radius: 10px; margin: 10px 0; text-align: center; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>イベント費用計算ツール</h1>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="fileInput">📂 名簿ファイル (.txt, .csv)</label>
+                <input type="file" id="fileInput" accept=".txt,.csv" onchange="loadFile()">
+            </div>
+        </div>
+
+        <div class="grid-container">
+            <div class="counters">
+                <h3>購入数</h3>
+                <div class="counter-display">
+                    <div class="counter-item">Tシャツ<strong id="tshirt-count">0</strong></div>
+                    <div class="counter-item">ハチマキ<strong id="headband-count">0</strong></div>
+                </div>
+            </div>
+             <div class="additional-tshirts">
+                <h3>👕 追加Tシャツ希望者</h3>
+                <div class="additional-tshirts-list" id="additional-tshirts-list"></div>
+                <button class="btn-secondary btn-small" onclick="addTshirtRequester()">+ 希望者を追加</button>
+            </div>
+        </div>
+        
+        <div class="costs">
+            <div class="grid-container">
+                <div class="cost-item">
+                    <label class="toggle-label"><input type="checkbox" id="tshirt-auto-toggle" onchange="toggleAutoCalc('tshirt')" checked> <strong>Tシャツ代自動計算</strong></label>
+                    <fieldset id="tshirt-auto-fields">
+                        <div class="control-group"><label>単価(円)</label><input type="number" id="tshirt-unit-price" value="2000" oninput="updateCountersAndCosts()"></div>
+                        <div class="control-group"><label>送料(円)</label><input type="number" id="tshirt-shipping" value="1000" oninput="updateCountersAndCosts()"></div>
+                    </fieldset>
+                    <div class="control-group total"><label for="tshirtCost"> Tシャツ代 (総額)</label><input type="number" id="tshirtCost" placeholder="0" readonly></div>
+                </div>
+                <div class="cost-item">
+                    <label class="toggle-label"><input type="checkbox" id="headband-auto-toggle" onchange="toggleAutoCalc('headband')" checked> <strong>ハチマキ代自動計算</strong></label>
+                    <fieldset id="headband-auto-fields">
+                        <div class="control-group"><label>単価(円)</label><input type="number" id="headband-unit-price" value="500" oninput="updateCountersAndCosts()"></div>
+                        <div class="control-group"><label>送料(円)</label><input type="number" id="headband-shipping" value="500" oninput="updateCountersAndCosts()"></div>
+                    </fieldset>
+                    <div class="control-group total"><label for="headbandCost"> ハチマキ代 (総額)</label><input type="number" id="headbandCost" placeholder="0" readonly></div>
+                </div>
+                <div class="cost-item">
+                     <h3>その他費用</h3>
+                     <div class="control-group"><label for="venueCost">🏢 会場費</label><input type="number" id="venueCost" value=""></div>
+                     <div class="control-group"><label for="miscCost">💸 諸経費</label><input type="number" id="miscCost" value="5000"></div>
+                </div>
+                <div class="cost-item">
+                    <h3>収入・税率</h3>
+                    <div class="control-group"><label for="supportCost">💰 支援費</label><input type="number" id="supportCost" value="20000"></div>
+                    <div class="control-group"><label for="tax-rate">消費税率(%)</label><input type="number" id="tax-rate" value="10" oninput="updateCountersAndCosts()"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="button-group">
+            <button class="btn-primary" onclick="calculateCosts()">💰 費用を計算</button>
+            <button class="btn-primary" onclick="calculateProfit()">📈 利益を計算</button>
+            <button class="btn-secondary" onclick="clearAll()">🗑️ クリア</button>
+        </div>
+
+        <div id="message" class="message-box"></div>
+        <div id="memberList"></div>
+        <div id="results"></div>
+        <div id="profit-container"></div>
+    </div>
+
+    <script>
+        let allMembers = [];
+
+        // --- 初期化 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            updateCountersAndCosts();
+            toggleAutoCalc('tshirt');
+            toggleAutoCalc('headband');
+        });
+
+        // --- ファイル処理 & 表示 ---
+        function loadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return showMessage('ファイルを選択してください。', 'error');
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const lines = e.target.result.split('\n').filter(Boolean);
+                    if (lines.length < 2) throw new Error("ファイルにはヘッダー行と少なくとも1つのデータ行が必要です。");
+                    const header = lines[0].trim().split(',');
+                    const nameIndex = header.indexOf('名簿');
+                    const participationIndex = header.indexOf('参加形式');
+                    if (nameIndex === -1 || participationIndex === -1) throw new Error("ヘッダーに「名簿」および「参加形式」の列が見つかりません。");
+
+                    allMembers = lines.slice(1).map((line, i) => {
+                        const data = line.trim().split(',');
+                        const name = data[nameIndex], participation = data[participationIndex];
+                        return (name && participation) ? { id: i, name, participation, wantsTshirt: false } : null;
+                    }).filter(Boolean);
+
+                    if (allMembers.length === 0) throw new Error("有効なメンバーデータが見つかりませんでした。");
+                    
+                    showMessage(`${allMembers.length}人のメンバーを読み込みました。`, 'success');
+                    displayMembers();
+                    clearResults();
+                } catch (err) {
+                    showMessage(`ファイル読み込みエラー: ${err.message}`, 'error');
+                    allMembers = [];
+                    displayMembers();
+                }
+            };
+            reader.onerror = () => showMessage('ファイルの読み込みに失敗しました。', 'error');
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function displayMembers() {
+            const memberListDiv = document.getElementById('memberList');
+            if (allMembers.length === 0) {
+                memberListDiv.innerHTML = '';
+                updateCountersAndCosts();
+                return;
+            }
+            const memberHTML = allMembers.map(member => {
+                let tagClass = '', tagText = '';
+                switch(member.participation) {
+                    case '両方参加': tagClass = 'tag-both'; tagText = '両方'; break;
+                    case '運動会だけ参加': tagClass = 'tag-sports'; tagText = '運動会のみ'; break;
+                    case '後夜祭だけ参加': tagClass = 'tag-festival'; tagText = '後夜祭のみ'; break;
+                    default: tagClass = ''; tagText = member.participation;
+                }
+                const checkboxHTML = member.participation === '後夜祭だけ参加' ? `<label><input type="checkbox" onchange="toggleTshirt(${member.id})"> Tシャツ希望</label>` : '';
+                return `<div class="member"><span class="member-name">${member.name}</span><span class="tag ${tagClass}">${tagText}</span>${checkboxHTML}</div>`;
+            }).join('');
+            memberListDiv.innerHTML = `<div class="member-list-container"><h3>📋 参加メンバー (${allMembers.length}人)</h3><div class="members">${memberHTML}</div></div>`;
+            updateCountersAndCosts();
+        }
+
+        // --- 動的更新 & 計算 ---
+        function toggleTshirt(memberId) {
+            const member = allMembers.find(m => m.id === memberId);
+            if (member) member.wantsTshirt = !member.wantsTshirt;
+            updateCountersAndCosts();
+        }
+        
+        function addTshirtRequester() {
+            const list = document.getElementById('additional-tshirts-list');
+            const div = document.createElement('div');
+            div.innerHTML = `<input type="text" placeholder="名前 (任意)" oninput="updateCountersAndCosts()"><input type="number" value="1" min="1" oninput="updateCountersAndCosts()"><button class="btn-secondary btn-small" onclick="this.parentElement.remove(); updateCountersAndCosts();">削除</button>`;
+            list.appendChild(div);
+            updateCountersAndCosts();
+        }
+
+        function updateCountersAndCosts() {
+            // カウンター計算
+            const sportsAndBoth = allMembers.filter(m => m.participation === '両方参加' || m.participation === '運動会だけ参加');
+            const afterPartyTshirtWanters = allMembers.filter(m => m.participation === '後夜祭だけ参加' && m.wantsTshirt);
+            let additionalTshirtCount = 0;
+            document.querySelectorAll('#additional-tshirts-list input[type="number"]').forEach(input => {
+                additionalTshirtCount += parseInt(input.value, 10) || 0;
+            });
+
+            const tshirtCount = sportsAndBoth.length + afterPartyTshirtWanters.length + additionalTshirtCount;
+            const headbandCount = sportsAndBoth.length;
+
+            document.getElementById('tshirt-count').textContent = tshirtCount;
+            document.getElementById('headband-count').textContent = headbandCount;
+            
+            // 自動計算
+            const taxRate = (parseFloat(document.getElementById('tax-rate').value) || 0) / 100;
+
+            if (document.getElementById('tshirt-auto-toggle').checked) {
+                const unitPrice = parseFloat(document.getElementById('tshirt-unit-price').value) || 0;
+                const shipping = parseFloat(document.getElementById('tshirt-shipping').value) || 0;
+                const total = (unitPrice * tshirtCount + shipping) * (1 + taxRate);
+                document.getElementById('tshirtCost').value = Math.ceil(total);
+            }
+             if (document.getElementById('headband-auto-toggle').checked) {
+                const unitPrice = parseFloat(document.getElementById('headband-unit-price').value) || 0;
+                const shipping = parseFloat(document.getElementById('headband-shipping').value) || 0;
+                const total = (unitPrice * headbandCount + shipping) * (1 + taxRate);
+                document.getElementById('headbandCost').value = Math.ceil(total);
+            }
+        }
+
+        function toggleAutoCalc(type) {
+            const isChecked = document.getElementById(`${type}-auto-toggle`).checked;
+            document.getElementById(`${type}-auto-fields`).disabled = !isChecked;
+            document.getElementById(`${type}Cost`).readOnly = isChecked;
+            if(isChecked) updateCountersAndCosts();
+        }
+
+        // --- 主要な計算ロジック ---
+        /**
+         * ▼▼▼【修正点】計算ロジックを修正 ▼▼▼
+         * - 追加希望者の費用をTシャツ代のみで計算し、最終結果に含めるように変更
+         */
+        function calculateCosts() {
+            if (allMembers.length === 0 && document.querySelectorAll('#additional-tshirts-list > div').length === 0) {
+                return showMessage('メンバーを読み込むか、追加希望者を入力してください。', 'error');
+            }
+
+            const tshirtTotalCost = parseFloat(document.getElementById('tshirtCost').value) || 0;
+            const headbandTotalCost = parseFloat(document.getElementById('headbandCost').value) || 0;
+            const venueCost = parseFloat(document.getElementById('venueCost').value) || 0;
+            const supportCost = parseFloat(document.getElementById('supportCost').value) || 0;
+            const miscCost = parseFloat(document.getElementById('miscCost').value) || 0;
+
+            const sportsAndBoth = allMembers.filter(m => m.participation === '両方参加' || m.participation === '運動会だけ参加');
+            const afterPartyTshirtWanters = allMembers.filter(m => m.participation === '後夜祭だけ参加' && m.wantsTshirt);
+            
+            let additionalTshirtCount = 0;
+            document.querySelectorAll('#additional-tshirts-list input[type="number"]').forEach(input => {
+                additionalTshirtCount += parseInt(input.value, 10) || 0;
+            });
+
+            const totalTshirtCount = sportsAndBoth.length + afterPartyTshirtWanters.length + additionalTshirtCount;
+            const headbandBuyersCount = sportsAndBoth.length;
+
+            // Tシャツ1枚あたりの単価を計算
+            const perUnitTshirtCost = totalTshirtCount > 0 ? tshirtTotalCost / totalTshirtCount : 0;
+            const perPersonHeadbandCost = headbandBuyersCount > 0 ? headbandTotalCost / headbandBuyersCount : 0;
+            const sharedCost = allMembers.length > 0 ? (venueCost + miscCost - supportCost) / allMembers.length : 0;
+            
+            const finalCosts = {};
+
+            // 1. 正規メンバーの費用を計算
+            allMembers.forEach(member => {
+                let total = sharedCost;
+                if (sportsAndBoth.includes(member)) {
+                    total += perUnitTshirtCost + perPersonHeadbandCost;
+                } else if (afterPartyTshirtWanters.includes(member)) {
+                    total += perUnitTshirtCost;
+                }
+                
+                const finalAmount = Math.ceil(total);
+                if (!finalCosts[finalAmount]) finalCosts[finalAmount] = [];
+                finalCosts[finalAmount].push(member.name);
+            });
+
+            // 2. 追加Tシャツ希望者の費用を計算 (共通費は含めない)
+            document.querySelectorAll('#additional-tshirts-list > div').forEach((row, index) => {
+                const nameInput = row.querySelector('input[type="text"]');
+                const quantityInput = row.querySelector('input[type="number"]');
+                
+                let name = nameInput.value.trim() || `追加希望者${index + 1}`;
+                const quantity = parseInt(quantityInput.value, 10) || 0;
+
+                if (quantity > 0) {
+                    const total = perUnitTshirtCost * quantity;
+                    const finalAmount = Math.ceil(total);
+                    if (!finalCosts[finalAmount]) finalCosts[finalAmount] = [];
+                    finalCosts[finalAmount].push(`${name}(${quantity}枚)`);
+                }
+            });
+
+            displayResults(perUnitTshirtCost, perPersonHeadbandCost, sharedCost, finalCosts);
+        }
+
+        function displayResults(tshirt, headband, shared, finalCosts) {
+            const resultsDiv = document.getElementById('results');
+            document.getElementById('profit-container').innerHTML = '';
+
+            const breakdownHTML = `<div class="result-box"><h3>基本費用（一人あたり単価）</h3><ul><li><span>Tシャツ代 (1枚)</span> <strong>${Math.ceil(tshirt).toLocaleString()} 円</strong></li><li><span>ハチマキ代 (購入者)</span> <strong>${Math.ceil(headband).toLocaleString()} 円</strong></li><li><span>共通費用 (参加者)</span> <strong>${Math.ceil(shared).toLocaleString()} 円</strong></li></ul></div>`;
+            const sortedCosts = Object.keys(finalCosts).sort((a, b) => parseInt(a) - parseInt(b));
+            const summaryHTML = `<div class="result-box"><h3>各自の請求額 (編集可)</h3><ul id="cost-summary-list">${sortedCosts.map(amount => `<li><div><input type="number" class="charge-input" value="${amount}" data-count="${finalCosts[amount].length}"><span>円 (${finalCosts[amount].length}人)</span></div><div class="names">${finalCosts[amount].join(', ')}</div></li>`).join('') || '<li>計算結果がありません。</li>'}</ul></div>`;
+            resultsDiv.innerHTML = `<div class="results-grid">${breakdownHTML}${summaryHTML}</div>`;
+            showMessage('費用の計算が完了しました。請求額を編集して利益計算ができます。', 'success');
+        }
+
+        function calculateProfit() {
+            const costInputs = document.querySelectorAll('#cost-summary-list .charge-input');
+            if (costInputs.length === 0) return showMessage('先に費用を計算してください。', 'error');
+
+            let collectedAmount = 0;
+            costInputs.forEach(input => {
+                collectedAmount += (parseFloat(input.value) || 0) * (parseInt(input.dataset.count, 10) || 0);
+            });
+            const supportCost = parseFloat(document.getElementById('supportCost').value) || 0;
+            const totalIncome = collectedAmount + supportCost;
+
+            const totalExpense = (parseFloat(document.getElementById('tshirtCost').value) || 0) + (parseFloat(document.getElementById('headbandCost').value) || 0) + (parseFloat(document.getElementById('venueCost').value) || 0) + (parseFloat(document.getElementById('miscCost').value) || 0);
+            const profit = totalIncome - totalExpense;
+
+            const profitContainer = document.getElementById('profit-container');
+            const resultClass = profit >= 0 ? 'profit' : 'loss';
+            const resultText = profit >= 0 ? '利益' : '損失';
+            profitContainer.innerHTML = `<div class="${resultClass}"><h3>最終収支</h3><p>総収入: ${totalIncome.toLocaleString()}円 (集金額: ${collectedAmount.toLocaleString()}円 + 支援費: ${supportCost.toLocaleString()}円)</p><p>総支出: ${totalExpense.toLocaleString()}円</p><h2>${resultText}: ${Math.abs(profit).toLocaleString()}円</h2></div>`;
+        }
+
+        // --- ユーティリティ ---
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="${type}">${message}</div>`;
+            setTimeout(() => messageDiv.innerHTML = '', 5000);
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('profit-container').innerHTML = '';
+        }
+
+        function clearAll() {
+            allMembers = [];
+            document.getElementById('fileInput').value = '';
+            document.getElementById('additional-tshirts-list').innerHTML = '';
+            displayMembers();
+            clearResults();
+            showMessage('すべての情報をクリアしました。', 'success');
+        }
+    </script>
+</body>
+</html>

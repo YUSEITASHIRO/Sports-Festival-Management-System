@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>投票データチェック</title>
+    <style>
+        :root {
+            --color-error: #f8d7da; --border-error: #f5c6cb;
+            --color-success: #d4edda; --border-success: #c3e6cb;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif; background: linear-gradient(135deg, #6a85b6 0%, #bac8e0 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 95%; width: 1200px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 30px; }
+        h1 { text-align: center; margin-bottom: 30px; font-size: 2.5em; background: linear-gradient(135deg, #6a85b6, #8a7c9e); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .controls { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px; margin-bottom: 20px; padding: 25px; background: #f5f7fa; border-radius: 15px; }
+        .control-group { display: flex; flex-direction: column; }
+        .control-group label { margin-bottom: 8px; font-weight: 600; color: #555; }
+        .control-group input, .control-group select, .control-group textarea { padding: 10px; border: 1px solid #ccc; border-radius: 8px; transition: border-color 0.3s; }
+        .control-group input:focus, .control-group select:focus, .control-group textarea:focus { outline: none; border-color: #6a85b6; }
+        .button-group { display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin: 25px 0; }
+        button { padding: 12px 25px; border: none; border-radius: 25px; font-size: 16px; font-weight: 600; cursor: pointer; transition: all 0.3s ease; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-primary { background: linear-gradient(135deg, #6a85b6, #8a7c9e); color: white; }
+        .btn-primary:not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(106, 133, 182, 0.4); }
+        .btn-secondary { background: linear-gradient(135deg, #cfd9df, #e2ebf0); color: #333; }
+        .btn-secondary:not(:disabled):hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(207, 217, 223, 0.5); }
+        .message-box { min-height: 50px; }
+        .message { padding: 15px; border-radius: 10px; margin: 10px 0; text-align: center; }
+        .success { background: var(--color-success); color: #155724; }
+        .error { background: var(--color-error); color: #721c24; }
+        .info { background: #cce5ff; color: #004085; }
+        #error-container { margin-top: 20px; }
+        .error-card { background: #fff; border: 1px solid var(--border-error); border-left: 5px solid #dc3545; border-radius: 8px; margin-bottom: 20px; padding: 20px; }
+        .error-card h3 { font-size: 1.5em; margin-bottom: 15px; color: #721c24; }
+        .error-item, .correction-form { margin-bottom: 15px; padding: 10px; border-radius: 5px; background: #fef5f5; }
+        .error-item strong { color: #dc3545; }
+        .error-item ul { margin-left: 20px; margin-top: 10px; margin-bottom: 10px;}
+        .correction-form label { font-weight: bold; display: block; margin-bottom: 5px; }
+        .correction-form select, .correction-form input, .correction-form textarea { width: 100%; }
+        .full-vote-form fieldset { border: 1px solid #ddd; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .full-vote-form legend { font-weight: bold; }
+        .festival-awards-placeholder { color: #888; text-align: center; padding: 10px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>投票データチェック</h1>
+        <div class="controls">
+            <div class="control-group">
+                <label for="undokaiFile">🏆 運動会結果ファイル (.txt)</label>
+                <input type="file" id="undokaiFile" accept=".txt" onchange="loadFile('undokai')">
+            </div>
+            <div class="control-group">
+                <label for="rosterFile">📂 名簿ファイル (.txt)</label>
+                <input type="file" id="rosterFile" accept=".txt" onchange="loadFile('roster')">
+            </div>
+            <div class="control-group">
+                <label for="votesFile">🗳️ 投票結果ファイル (.csv)</label>
+                <input type="file" id="votesFile" accept=".csv" onchange="loadFile('votes')">
+            </div>
+        </div>
+        <div class="button-group">
+            <button class="btn-primary" id="checkBtn" onclick="runChecks()">🔍 チェック開始</button>
+            <button class="btn-primary" id="recheckBtn" onclick="applyAndRecheck()" disabled>🔄 修正を適用して再チェック</button>
+            <button class="btn-primary" id="exportBtn" onclick="exportCorrectedCSV()" disabled>💾 修正済みCSVを出力</button>
+            <button class="btn-secondary" onclick="clearCsvData()">🗑️ CSVクリア</button>
+        </div>
+        <div id="message" class="message-box"></div>
+        <div id="error-container"></div>
+    </div>
+    <script>
+        let roster = [], votes = [], originalHeaders = [], teams = [], undokaiData = { teams: [], scores: [] }, awardCols = { festival: [], individual: {} };
+
+        async function loadFile(type) {
+            const fileInputId = { roster: 'rosterFile', votes: 'votesFile', undokai: 'undokaiFile' }[type];
+            const fileInput = document.getElementById(fileInputId);
+            const file = fileInput.files[0];
+            if (!file) return;
+            try {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    try {
+                        let text = e.target.result;
+                        if (type === 'roster') parseRoster(text);
+                        else if (type === 'votes') parseVotes(text);
+                        else if (type === 'undokai') parseUndokai(text);
+                        
+                        let successMessage = '';
+                        if (type === 'roster') successMessage = `${roster.length}人の名簿データを読み込みました。`;
+                        else if (type === 'votes') successMessage = `${votes.length}件の投票データを読み込みました。`;
+                        else if (type === 'undokai') successMessage = `運動会結果（${undokaiData.teams.length}チーム）を読み込みました。`;
+                        showMessage(successMessage, 'success');
+
+                    } catch(err) { showMessage(err.message, 'error'); }
+                };
+                reader.readAsText(file, 'UTF-8');
+            } catch (err) { showMessage(`ファイル読み込みエラー: ${err.message}`, 'error'); }
+        }
+
+        function parseUndokai(text) {
+            if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
+            const lines = text.split(/\r?\n/);
+            const teamLine = lines.find(line => line.startsWith('チーム名:'));
+            const scoreLine = lines.find(line => line.startsWith('得点:'));
+
+            if (!teamLine || !scoreLine) {
+                throw new Error("運動会結果ファイルに「チーム名:」または「得点:」の行が見つかりません。");
+            }
+
+            const parsedTeams = teamLine.replace('チーム名:', '').split(',').map(t => t.trim());
+            const parsedScores = scoreLine.replace('得点:', '').split(',').map(s => s.trim());
+
+            if (parsedTeams.length === 0 || parsedScores.length === 0 || parsedTeams.length !== parsedScores.length) {
+                throw new Error("チーム名または得点のデータが正しく読み取れませんでした。");
+            }
+
+            undokaiData = { teams: parsedTeams, scores: parsedScores };
+            teams = parsedTeams;
+        }
+
+        function parseRoster(text) {
+            if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
+            const lines = text.split(/\r?\n/).filter(Boolean);
+            const header = lines.shift().trim().split(',').map(h => h.replace(/["<>]/g, ''));
+            const nameIdx = header.indexOf('名簿'), partIdx = header.indexOf('参加形式'), genderIdx = header.indexOf('性別');
+            if ([nameIdx, partIdx, genderIdx].includes(-1)) throw new Error("名簿ファイルに「名簿」「参加形式」「性別」の列が見つかりません。");
+            roster = lines.map(line => {
+                const data = line.trim().split(',');
+                return { name: data[nameIdx]?.trim(), participation: data[partIdx]?.trim(), gender: data[genderIdx]?.trim() };
+            }).filter(p => p.name);
+        }
+
+        function parseVotes(text) {
+            if (text.charCodeAt(0) === 0xFEFF) text = text.substring(1);
+            let lines = text.split(/\r?\n/).filter(Boolean);
+            originalHeaders = lines.shift().trim().split(',');
+            const cleanedHeaders = originalHeaders.map(h => h.replace(/["<>]/g, ''));
+            const festivalEndIdx = cleanedHeaders.indexOf('主演男優賞');
+            if (festivalEndIdx === -1) throw new Error("CSVに「主演男優賞」が見つかりません。");
+            awardCols.festival = [];
+            for (let i = 3; i < festivalEndIdx; i += 2) awardCols.festival.push({ name: cleanedHeaders[i], index: i });
+            const individualNames = ['主演男優賞', '主演女優賞', '助演男優賞', '助演女優賞', '運動会 MVP'];
+            awardCols.individual = {};
+            individualNames.forEach(name => {
+                const index = cleanedHeaders.indexOf(name);
+                if (index > -1) awardCols.individual[name] = index;
+            });
+            const csvToArray = str => {
+                const result = []; let current = '', inQuote = false, field = '';
+                for (let char of str) {
+                    if (char === '"' && !inQuote) inQuote = true;
+                    else if (char === '"' && inQuote) inQuote = false;
+                    else if (char === ',' && !inQuote) { result.push(field.trim()); field = ''; }
+                    else field += char;
+                }
+                result.push(field.trim());
+                return result;
+            };
+            votes = lines.map((line, index) => {
+                const data = csvToArray(line);
+                return { originalIndex: index, data, voterName: data[1]?.replace(/"/g, ''), voterTeam: data[2]?.replace(/"/g, '') };
+            });
+        }
+
+        function runChecks() {
+            if (teams.length === 0) return showMessage('運動会結果ファイルを読み込んでください。', 'error');
+            if (roster.length === 0) return showMessage('名簿ファイルを読み込んでください。', 'error');
+            if (votes.length === 0) return showMessage('投票結果ファイルを読み込んでください。', 'error');
+            
+            let errors = [];
+            const voterCounts = {};
+            votes.forEach((vote, voteIndex) => {
+                const { voterName, voterTeam, originalIndex } = vote;
+                const displayName = voterName || `(名前不明、CSV ${originalIndex + 2}行目)`;
+                if (!voterName) {
+                    errors.push({ type: 'empty_name', voterName: displayName, voteIndex });
+                    return;
+                }
+                voterCounts[voterName] = (voterCounts[voterName] || 0) + 1;
+                if (!voterTeam) {
+                    errors.push({ type: 'empty_team', voterName, voteIndex });
+                }
+                awardCols.festival.forEach(award => {
+                    const votedTeam = vote.data[award.index]?.replace(/"/g, '').trim();
+                    if (!votedTeam) {
+                        errors.push({ type: 'empty_festival_award', voterName, award: award.name, voteIndex });
+                    } else if (votedTeam === voterTeam) {
+                        errors.push({ type: 'self_team', voteIndex: voteIndex, voterName, award: award.name });
+                    }
+                });
+                Object.entries(awardCols.individual).forEach(([awardName, colIndex]) => {
+                    if (vote.data[colIndex]?.replace(/"/g, '') === voterName) {
+                        errors.push({ type: 'self_person', voteIndex: voteIndex, voterName, award: awardName, colIndex });
+                    }
+                });
+            });
+            Object.keys(voterCounts).filter(name => voterCounts[name] > 1 && name).forEach(name => errors.push({ type: 'duplicate_vote', voterName: name }));
+            const votedNames = new Set(votes.map(v => v.voterName).filter(Boolean));
+            roster.forEach(person => {
+                if (!votedNames.has(person.name)) errors.push({ type: 'non_voter', voterName: person.name });
+            });
+
+            document.getElementById('recheckBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = true;
+
+            if (errors.length === 0) {
+                showMessage('エラーは見つかりませんでした。CSVファイルを出力できます。', 'success');
+                document.getElementById('exportBtn').disabled = false;
+                document.getElementById('error-container').innerHTML = '';
+            } else {
+                showMessage(`${errors.length}件のエラーが見つかりました。修正してください。`, 'error');
+                displayErrors(errors);
+                document.getElementById('recheckBtn').disabled = false;
+            }
+        }
+        
+        // --- ▼▼▼【機能修正】エラー修正方法のロジックを全面的に見直し ▼▼▼ ---
+        function displayErrors(errors) {
+            const container = document.getElementById('error-container');
+            container.innerHTML = '';
+            const errorsByVoter = errors.reduce((acc, err) => {
+                if (!acc[err.voterName]) acc[err.voterName] = [];
+                acc[err.voterName].push(err);
+                return acc;
+            }, {});
+
+            Object.entries(errorsByVoter).forEach(([voterName, voterErrors]) => {
+                const card = document.createElement('div');
+                card.className = 'error-card';
+                card.innerHTML = `<h3>⚠️ ${voterName} さんの問題</h3>`;
+                
+                const errorTypes = new Set(voterErrors.map(e => e.type));
+                const needsFullReVote = errorTypes.has('duplicate_vote') || errorTypes.has('non_voter') || 
+                                      errorTypes.has('empty_team') || errorTypes.has('empty_festival_award');
+
+                if (needsFullReVote) {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.className = 'error-item';
+                    
+                    let desc = '';
+                    if (errorTypes.has('non_voter')) {
+                        desc = `<p><strong>[未投票]</strong> この方はまだ投票していません。投票内容を入力してください。</p>`;
+                    } else {
+                        desc = `<p><strong>[入力内容の修正が必要]</strong> 以下の問題が検出されたため、この投票全体を再入力してください。</p><ul>`;
+                        if (errorTypes.has('duplicate_vote')) desc += `<li>複数回投票しています。</li>`;
+                        if (errorTypes.has('empty_team')) desc += `<li>「あなたのチーム」が選択されていません。</li>`;
+                        voterErrors.filter(e => e.type === 'empty_festival_award').forEach(err => {
+                            desc += `<li>後夜祭賞「${err.award}」が未投票です。</li>`;
+                        });
+                        voterErrors.filter(e => e.type === 'self_team' || e.type === 'self_person').forEach(err => {
+                            desc += `<li>「${err.award}」で${err.type === 'self_team' ? '自チームに' : '自分自身に'}投票しています。</li>`;
+                        });
+                        desc += `</ul>`;
+                    }
+                    
+                    const isNewVote = errorTypes.has('non_voter');
+                    const dataType = isNewVote ? 'new-vote' : 're-vote';
+                    const originalVote = votes.find(v => v.voterName === voterName);
+                    const knownTeam = originalVote ? originalVote.voterTeam : '';
+                    
+                    itemDiv.innerHTML = desc + `<div class="correction-form full-vote-form" data-type="${dataType}" data-voter-name="${voterName}">${generateFullVoteForm(voterName, isNewVote, knownTeam)}</div>`;
+                    card.appendChild(itemDiv);
+                } else {
+                    // 全体再入力が不要なエラー（自己投票、名前未入力など）のみを個別に表示
+                    voterErrors.forEach(err => {
+                        const itemDiv = document.createElement('div');
+                        itemDiv.className = 'error-item';
+                        switch (err.type) {
+                            case 'empty_name':
+                                itemDiv.innerHTML = `<p><strong>[名前が未入力]</strong> この投票データには名前がありません。</p>`;
+                                break;
+                            case 'self_team':
+                                const originalVote = votes[err.voteIndex];
+                                itemDiv.innerHTML = `<p><strong>[自チーム投票]</strong> 「${err.award}」で自チームに投票しています。</p><div class="correction-form"><label>→ 修正後の投票先:</label><select data-type="fix" data-vote-index="${err.voteIndex}" data-col-index="${awardCols.festival.find(a=>a.name===err.award).index}">${teams.filter(t => t !== originalVote.voterTeam).map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>`;
+                                break;
+                            case 'self_person':
+                                const candidates = getEligibleCandidates(err.award, voterName);
+                                itemDiv.innerHTML = `<p><strong>[自分自身への投票]</strong> 「${err.award}」で自分に投票しています。</p><div class="correction-form"><label>→ 修正後の投票先:</label><select data-type="fix" data-vote-index="${err.voteIndex}" data-col-index="${err.colIndex}"><option value="">選択</option>${candidates.map(p => `<option value="${p.name}">${p.name}</option>`).join('')}</select></div>`;
+                                break;
+                        }
+                        card.appendChild(itemDiv);
+                    });
+                }
+                container.appendChild(card);
+            });
+        }
+
+        function generateFullVoteForm(voterName, includeReasons, knownTeam) {
+            const sanitizedVoterName = voterName.replace(/[\s'"]/g, '');
+            let teamOptions = teams.map(t => `<option value="${t}" ${t === knownTeam ? 'selected' : ''}>${t}</option>`).join('');
+            
+            let festivalAwardsHTML = `<p class="festival-awards-placeholder">↑ まずあなたのチームを選択してください。</p>`;
+            if (knownTeam) {
+                festivalAwardsHTML = '';
+                const otherTeams = teams.filter(t => t !== knownTeam);
+                awardCols.festival.forEach(award => {
+                    festivalAwardsHTML += `<div><label>${award.name}:</label><select name="${award.name}" required><option value="">選択</option>${otherTeams.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>`;
+                    if (includeReasons) festivalAwardsHTML += `<div><label>理由:</label><textarea name="${award.name}_reason"></textarea></div>`;
+                });
+            }
+            let formHTML = `<fieldset><legend>ステップ1: チームを選択</legend><label>あなたのチーム:</label><select name="voterTeam" onchange="updateFestivalAwards(this)" data-voter-id="${sanitizedVoterName}"><option value="">選択してください</option>${teamOptions}</select></fieldset><fieldset><legend>ステップ2: 後夜祭賞 (必須)</legend><div id="festival-awards-container-${sanitizedVoterName}">${festivalAwardsHTML}</div></fieldset><fieldset><legend>ステップ3: 個人賞 (任意)</legend>`;
+            Object.entries(awardCols.individual).forEach(([awardName]) => {
+                const candidates = getEligibleCandidates(awardName);
+                formHTML += `<div><label>${awardName}:</label><select name="${awardName}"><option value="">(投票しない)</option>${candidates.map(p => `<option value="${p.name}">${p.name}</option>`).join('')}</select></div>`;
+                if (includeReasons) formHTML += `<div><label>理由:</label><textarea name="${awardName}_reason"></textarea></div>`;
+            });
+            formHTML += `</fieldset>`;
+            return formHTML;
+        }
+
+        function updateFestivalAwards(selectElement) {
+            const selectedTeam = selectElement.value, voterId = selectElement.dataset.voterId;
+            const container = document.getElementById(`festival-awards-container-${voterId}`);
+            if (!selectedTeam) { container.innerHTML = `<p class="festival-awards-placeholder">↑ まずあなたのチームを選択してください。</p>`; return; }
+            const includeReasons = !!container.closest('[data-type="new-vote"]');
+            let awardsHTML = '';
+            const otherTeams = teams.filter(t => t !== selectedTeam);
+            awardCols.festival.forEach(award => {
+                awardsHTML += `<div><label>${award.name}:</label><select name="${award.name}" required><option value="">選択</option>${otherTeams.map(t => `<option value="${t}">${t}</option>`).join('')}</select></div>`;
+                if (includeReasons) awardsHTML += `<div><label>理由:</label><textarea name="${award.name}_reason"></textarea></div>`;
+            });
+            container.innerHTML = awardsHTML;
+        }
+        
+        function applyAndRecheck() {
+            try {
+                applyCorrections();
+                showMessage('修正を適用しました。再チェックを実行します。', 'info');
+                runChecks();
+            } catch (err) {
+                showMessage(`修正適用エラー: ${err.message}`, 'error');
+            }
+        }
+
+        function applyCorrections() {
+            let correctedVotes = JSON.parse(JSON.stringify(votes));
+            document.querySelectorAll('select[data-type="fix"]').forEach(select => {
+                const voteIndex = parseInt(select.dataset.voteIndex, 10);
+                const colIndex = parseInt(select.dataset.colIndex, 10);
+                if (select.value && correctedVotes[voteIndex]) {
+                    correctedVotes[voteIndex].data[colIndex] = select.value;
+                }
+            });
+            const multiVoters = [...document.querySelectorAll('[data-type="re-vote"]')].map(f => f.dataset.voterName);
+            let finalVotes = correctedVotes.filter(v => !multiVoters.includes(v.voterName));
+            document.querySelectorAll('.correction-form[data-type="re-vote"], .correction-form[data-type="new-vote"]').forEach(form => {
+                const voterName = form.dataset.voterName;
+                const newRow = createVoteRowFromForm(form, voterName);
+                finalVotes.push({ originalIndex: -1, data: newRow, voterName: newRow[1], voterTeam: newRow[2] });
+            });
+            votes = finalVotes;
+        }
+
+        function getEligibleCandidates(award, excludeName = null) {
+            let filtered = roster;
+            if (['主演女優賞', '助演女優賞'].includes(award)) filtered = roster.filter(p => p.gender === '女' && (p.participation === '両方参加' || p.participation === '後夜祭だけ参加'));
+            else if (['主演男優賞', '助演男優賞'].includes(award)) filtered = roster.filter(p => p.gender === '男' && (p.participation === '両方参加' || p.participation === '後夜祭だけ参加'));
+            else if (award === '運動会 MVP') filtered = roster.filter(p => p.participation === '両方参加' || p.participation === '運動会だけ参加');
+            return excludeName ? filtered.filter(p => p.name !== excludeName) : filtered;
+        }
+        
+        function exportCorrectedCSV() {
+            if (document.getElementById('error-container').innerHTML.trim() !== '' && !confirm('まだ解決していないエラーがありますが、このまま出力しますか？')) {
+                return;
+            }
+
+            const undokaiHeader = [
+                "チーム名:" + undokaiData.teams.join(','),
+                "得点:" + undokaiData.scores.join(',')
+            ].join('\n');
+
+            const headersWithoutTimestamp = originalHeaders.slice(1);
+            const dataRows = votes.map(v => {
+                const dataWithoutTimestamp = v.data.slice(1);
+                // 各セルをダブルクォートで囲み、中のダブルクォートは2つにエスケープする
+                return dataWithoutTimestamp.map(d => `"${(d || '').replace(/"/g, '""')}"`).join(',');
+            });
+
+            const csvContent = [
+                undokaiHeader,
+                headersWithoutTimestamp.join(','),
+                ...dataRows
+            ].join('\n');
+
+            const blob = new Blob([new Uint8Array([0xEF, 0xBB, 0xBF]), csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "output2.csv";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            showMessage('修正済みCSVファイル(output2.csv)をダウンロードしました。', 'success');
+        }
+        
+        function createVoteRowFromForm(form, voterName) {
+            const cleanedHeaders = originalHeaders.map(h => h.replace(/["<>]/g, ''));
+            const newRow = new Array(originalHeaders.length).fill('');
+            newRow[0] = new Date().toLocaleString('ja-JP').replace(/\//g, '-');
+            newRow[1] = voterName;
+            newRow[2] = form.querySelector('select[name="voterTeam"]')?.value || '';
+            form.querySelectorAll('select, textarea').forEach(input => {
+                if (input.name === 'voterTeam') return;
+                const colName = input.name.replace('_reason', '');
+                const isReason = input.name.endsWith('_reason');
+                const colIndex = cleanedHeaders.indexOf(colName) + (isReason ? 1 : 0);
+                if (colIndex > -1) newRow[colIndex] = input.value;
+            });
+            return newRow;
+        }
+
+        function showMessage(message, type = 'info') { document.getElementById('message').innerHTML = `<div class="message ${type}">${message}</div>`; }
+        function clearCsvData() {
+            votes = [];
+            originalHeaders = [];
+            document.getElementById('votesFile').value = '';
+            document.getElementById('message').innerHTML = '';
+            document.getElementById('error-container').innerHTML = '';
+            document.getElementById('recheckBtn').disabled = true;
+            document.getElementById('exportBtn').disabled = true;
+            showMessage('CSVファイルの情報とチェック結果をクリアしました。', 'info');
+        }
+    </script>
+</body>
+</html>

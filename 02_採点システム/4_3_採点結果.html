@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CH Festival 採点結果</title>
+    <style>
+        :root {
+            --primary-color-start: #007bff; --primary-color-end: #0056b3;
+            --secondary-color: #6c757d; --background-gradient-start: #f4f6f9;
+            --background-gradient-end: #e9edf2; --container-bg: #ffffff;
+            --text-color: #333; --heading-color-start: #3a3a3a; --heading-color-end: #111;
+            --border-color: #dee2e6; --winner-bg: #fffbe6;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+            background: linear-gradient(135deg, var(--background-gradient-start) 0%, var(--background-gradient-end) 100%);
+            min-height: 100vh; padding: 20px; color: var(--text-color); line-height: 1.6;
+        }
+        .container {
+            max-width: 95%; width: 1200px; margin: 0 auto; background: var(--container-bg);
+            border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); padding: 30px;
+        }
+        h1, h2, h3, h4, h5, h6 {
+            background: linear-gradient(135deg, var(--heading-color-start), var(--heading-color-end));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            text-align: center; margin-bottom: 20px;
+        }
+        h1 { font-size: 2.5em; }
+        h2 { font-size: 2em; margin-top: 40px; }
+        h3 { font-size: 1.5em; text-align: left; border-bottom: 2px solid var(--primary-color-start); padding-bottom: 10px; }
+        h4 { font-size: 1.2em; text-align: left; }
+        h5 { font-size: 1.1em; text-align: left; }
+        h6 { font-size: 1.0em; text-align: left; margin-top: 15px; margin-bottom: 5px; color: #333; -webkit-text-fill-color: initial;}
+        .grid-container {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px; margin-bottom: 20px; padding: 25px;
+            background: #f8f9fa; border-radius: 15px;
+        }
+        .control-group { display: flex; flex-direction: column; }
+        .control-group label { margin-bottom: 8px; font-weight: 600; color: #555; }
+        .control-group input {
+            padding: 10px; border: 1px solid var(--border-color); border-radius: 8px;
+            transition: border-color 0.3s;
+        }
+        .control-group input:focus { outline: none; border-color: var(--primary-color-start); }
+        .button-group {
+            display: flex; gap: 15px; flex-wrap: wrap; justify-content: center; margin: 25px 0;
+        }
+        button {
+            padding: 12px 25px; border: none; border-radius: 25px; font-size: 16px;
+            font-weight: 600; cursor: pointer; transition: all 0.3s ease;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color-start), var(--primary-color-end));
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 10px 25px rgba(0, 123, 255, 0.4); }
+        .message-box { min-height: 50px; text-align: center; }
+        .message {
+            padding: 15px; border-radius: 10px; margin: 10px auto; display: inline-block;
+        }
+        .error { background: #f8d7da; color: #721c24; }
+        .success { background: #d4edda; color: #155724; }
+        .results-section { margin-top: 30px; display: none; }
+        .result-table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .result-table th, .result-table td {
+            padding: 12px; text-align: center; border: 1px solid var(--border-color);
+        }
+        .result-table th { background-color: #f2f2f2; font-weight: 600; }
+        .result-table tr:nth-child(even) { background-color: #f9f9f9; }
+        .result-table tr:hover { background-color: #f1f1f1; }
+        .result-table .rank-1 { background-color: var(--winner-bg); font-weight: bold; }
+        .reasons-list {
+            list-style-type: none; padding: 0; margin-top: 5px; max-height: 200px;
+            overflow-y: auto; background: #fafafa; border: 1px solid #eee; border-radius: 8px;
+        }
+        .reasons-list li { padding: 8px 12px; border-bottom: 1px solid #eee; }
+        .reasons-list li:last-child { border-bottom: none; }
+        .award-winner { font-size: 1.2em; font-weight: bold; color: var(--primary-color-end); }
+        .award-card {
+            background: #fff; border-left: 5px solid var(--primary-color-start);
+            padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin-bottom: 20px;
+        }
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🏆 CH Festival 採点結果</h1>
+
+        <div id="setup-section">
+            <h2>1. 設定とデータ読込</h2>
+            <div class="grid-container">
+                <div class="control-group">
+                    <label for="fileInput">📂 投票結果CSVファイル</label>
+                    <input type="file" id="fileInput" accept=".csv">
+                </div>
+                <div class="control-group">
+                    <label for="totalAfterpartyPoints">🎯 後夜祭 総得点</label>
+                    <input type="number" id="totalAfterpartyPoints" value="400">
+                </div>
+            </div>
+        </div>
+
+        <div id="sports-day-section" class="hidden">
+            <h2>2. 集計実行</h2>
+            <div class="button-group">
+                <button class="btn-primary" onclick="calculateAllResults()">📊 全ての得点を集計して結果を表示</button>
+            </div>
+        </div>
+        
+        <div id="message" class="message-box"></div>
+
+        <div id="results-section" class="results-section">
+            <div id="overall-results">
+                <h2>🏆 総合結果発表</h2>
+                <table class="result-table" id="overall-table"></table>
+            </div>
+            <div id="sports-day-results">
+                <h2>👟 運動会 結果発表</h2>
+                <table class="result-table" id="sports-day-table"></table>
+            </div>
+            <div id="afterparty-results">
+                <h2>🎉 後夜祭 結果詳細</h2>
+                <h3>後夜祭 総合ランキング</h3>
+                <table class="result-table" id="afterparty-rank-table"></table>
+                <h3 style="margin-top: 30px;">各賞の集計結果と投票理由</h3>
+                <div id="afterparty-awards-details"></div>
+            </div>
+            <div id="personal-award-results">
+                <h2>🌟 個人賞発表</h2>
+                <div id="personal-awards-details"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let appData = {
+            headers: [], voters: [], teams: new Map(), afterpartyAwards: [],
+            personalAwards: [ "主演男優賞", "主演女優賞", "助演男優賞", "助演女優賞", "運動会 MVP" ],
+            sportsDayScores: new Map(),
+        };
+
+        document.getElementById('fileInput').addEventListener('change', handleFileUpload);
+
+        function showMessage(message, type = 'info') {
+            document.getElementById('message').innerHTML = `<div class="message ${type}">${message}</div>`;
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    parseCSV(e.target.result);
+                    document.getElementById('sports-day-section').classList.remove('hidden');
+                    showMessage('CSV読み込み完了。運動会の得点も読み込みました。「全ての得点を集計して結果を表示」ボタンを押してください。', 'success');
+                } catch (err) {
+                    showMessage(`エラー: ${err.message}`, 'error');
+                    document.getElementById('sports-day-section').classList.add('hidden');
+                    document.getElementById('results-section').style.display = 'none';
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function parseCSV(csvText) {
+            const cleanValue = (val) => val.trim().replace(/^"|"$/g, '');
+            const lines = csvText.split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 4) throw new Error('CSVファイルは、運動会のチーム名、得点、ヘッダー、最低1行の投票データを含む4行以上が必要です。');
+
+            // 1-2行目: 運動会のスコアを読み込む
+            let teamLine = lines[0];
+            if (teamLine.startsWith('チーム名:')) {
+                teamLine = teamLine.substring('チーム名:'.length);
+            }
+            const sportTeams = teamLine.split(',').map(cleanValue);
+            
+            let scoreLine = lines[1];
+            if (scoreLine.startsWith('得点:')) {
+                scoreLine = scoreLine.substring('得点:'.length);
+            }
+            const sportScores = scoreLine.split(',').map(val => parseFloat(cleanValue(val)));
+
+            if (sportTeams.length !== sportScores.length) {
+                throw new Error('1行目のチーム数と2行目の得点数が一致しません。');
+            }
+
+            appData.sportsDayScores.clear();
+            appData.teams.clear();
+            sportTeams.forEach((team, index) => {
+                appData.sportsDayScores.set(team, sportScores[index] || 0);
+                if (!appData.teams.has(team)) {
+                    appData.teams.set(team, { members: [] });
+                }
+            });
+            
+            if (appData.teams.size === 0) throw new Error('有効なチーム情報がCSVの1行目から見つかりませんでした。');
+
+            // 3行目以降: 投票データを読み込む
+            appData.headers = lines[2].split(',').map(cleanValue);
+            const rawData = lines.slice(3);
+            
+            appData.voters = [];
+            appData.afterpartyAwards = appData.headers.slice(2, 12).filter((_, i) => i % 2 === 0);
+
+            rawData.forEach(line => {
+                const values = line.split(',').map(cleanValue);
+                const voterTeam = values[1];
+                if (!voterTeam) return;
+
+                const voterData = { name: values[0], team: voterTeam, votes: {}, reasons: {} };
+                appData.afterpartyAwards.forEach((award, i) => {
+                    const voteIndex = 2 + i * 2;
+                    voterData.votes[award] = values[voteIndex] || '';
+                    voterData.reasons[award] = values[voteIndex + 1] || '';
+                });
+                appData.personalAwards.forEach(award => {
+                    const voteIndex = appData.headers.indexOf(award);
+                    if (voteIndex !== -1) {
+                        voterData.votes[award] = values[voteIndex] || '';
+                        voterData.reasons[award] = values[voteIndex + 1] || '';
+                    }
+                });
+                appData.voters.push(voterData);
+                
+                if (appData.teams.has(voterTeam)) {
+                    appData.teams.get(voterTeam).members.push(voterData.name);
+                }
+            });
+        }
+
+        function calculateAllResults() {
+            try {
+                const sportsScores = appData.sportsDayScores;
+                
+                const totalAfterpartyPoints = parseFloat(document.getElementById('totalAfterpartyPoints').value) || 400;
+                const afterpartyScores = calculateAfterpartyScores(totalAfterpartyPoints);
+                const personalAwardsResults = tallyPersonalAwards();
+
+                const overallScores = new Map();
+                appData.teams.forEach((_, teamName) => {
+                    const total = (sportsScores.get(teamName) || 0) + (afterpartyScores.finalScores.get(teamName) || 0);
+                    overallScores.set(teamName, { sports: sportsScores.get(teamName) || 0, afterparty: afterpartyScores.finalScores.get(teamName) || 0, total });
+                });
+                
+                displayResults({ overall: overallScores, sports: sportsScores, afterparty: afterpartyScores, personal: personalAwardsResults });
+                showMessage('集計が完了しました！', 'success');
+            } catch(e) {
+                showMessage(`計算エラー: ${e.message}`, 'error');
+            }
+        }
+
+        function calculateAfterpartyScores(totalPoints) {
+            const teamNames = Array.from(appData.teams.keys());
+            const totalVoters = appData.voters.length;
+            const voteCounts = new Map(), voteReasons = new Map();
+
+            appData.afterpartyAwards.forEach(award => {
+                const awardVotes = new Map(), awardReasons = new Map();
+                teamNames.forEach(team => { awardVotes.set(team, 0); awardReasons.set(team, []); });
+                appData.voters.forEach(voter => {
+                    const votedTeam = voter.votes[award];
+                    if (appData.teams.has(votedTeam)) {
+                        awardVotes.set(votedTeam, awardVotes.get(votedTeam) + 1);
+                        if(voter.reasons[award]) awardReasons.get(votedTeam).push(voter.reasons[award]);
+                    }
+                });
+                voteCounts.set(award, awardVotes);
+                voteReasons.set(award, awardReasons);
+            });
+            
+            const ratios = new Map();
+            appData.afterpartyAwards.forEach(award => {
+                const awardRatios = new Map();
+                teamNames.forEach(team => {
+                    const divisor = totalVoters - appData.teams.get(team).members.length;
+                    awardRatios.set(team, divisor > 0 ? voteCounts.get(award).get(team) / divisor : 0);
+                });
+                ratios.set(award, awardRatios);
+            });
+
+            const normalizedScores = new Map();
+            appData.afterpartyAwards.forEach(award => {
+                const awardRatios = ratios.get(award);
+                const sumOfRatios = Array.from(awardRatios.values()).reduce((a, b) => a + b, 0);
+                const awardNormalized = new Map();
+                teamNames.forEach(team => awardNormalized.set(team, sumOfRatios > 0 ? awardRatios.get(team) / sumOfRatios : 0));
+                normalizedScores.set(award, awardNormalized);
+            });
+
+            const totalNormalizedByTeam = new Map();
+            teamNames.forEach(team => totalNormalizedByTeam.set(team, 0));
+            normalizedScores.forEach(awardScores => awardScores.forEach((score, team) => totalNormalizedByTeam.set(team, totalNormalizedByTeam.get(team) + score)));
+            
+            const grandTotalNormalized = Array.from(totalNormalizedByTeam.values()).reduce((a,b) => a+b, 0);
+            const finalScores = new Map();
+            teamNames.forEach(team => finalScores.set(team, grandTotalNormalized > 0 ? (totalNormalizedByTeam.get(team) / grandTotalNormalized) * totalPoints : 0));
+            
+            return { finalScores, voteCounts, voteReasons, normalizedScores };
+        }
+
+        function tallyPersonalAwards() {
+            const results = new Map();
+            appData.personalAwards.forEach(award => {
+                const counts = new Map(), reasons = new Map();
+                appData.voters.forEach(voter => {
+                    const nominee = voter.votes[award];
+                    if (nominee) {
+                        counts.set(nominee, (counts.get(nominee) || 0) + 1);
+                        if (voter.reasons[award]) {
+                            if (!reasons.has(nominee)) reasons.set(nominee, []);
+                            reasons.get(nominee).push(voter.reasons[award]);
+                        }
+                    }
+                });
+                
+                if (counts.size > 0) {
+                    const sorted = [...counts.entries()].sort((a,b) => b[1] - a[1]);
+                    const maxVotes = sorted[0][1];
+                    const winners = sorted.filter(([, votes]) => votes === maxVotes).map(([name]) => name);
+                    results.set(award, { winners, reasons });
+                } else {
+                     results.set(award, { winners: ["該当者なし"], reasons: new Map() });
+                }
+            });
+            return results;
+        }
+
+        function displayResults(results) {
+            displayOverallResults(results.overall);
+            displaySportsDayResults(results.sports);
+            displayAfterpartyResults(results.afterparty);
+            displayPersonalAwards(results.personal);
+            document.getElementById('results-section').style.display = 'block';
+            document.getElementById('results-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function createSortedTable(data, headers, scoreKey = 'total') {
+            const sortedData = [...data.entries()].sort((a,b) => b[1][scoreKey] - a[1][scoreKey]);
+            let html = `<thead><tr><th>順位</th>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+            if (sortedData.length === 0) return html + `<tr><td colspan="${headers.length + 1}">データがありません。</td></tr></tbody>`;
+            
+            let rank = 1;
+            sortedData.forEach(([teamName, scores], index) => {
+                if (index > 0 && scores[scoreKey] < sortedData[index-1][1][scoreKey]) rank = index + 1;
+                const isWinner = rank === 1 ? 'class="rank-1"' : '';
+                const values = Object.values(scores).map(s => typeof s === 'number' ? s.toFixed(2) : s);
+                html += `<tr ${isWinner}><td>${rank}位</td><td>${teamName}</td>${values.map(v => `<td>${v}</td>`).join('')}</tr>`;
+            });
+            return html + '</tbody>';
+        }
+
+        function displayOverallResults(overallScores) {
+            const headers = ["チーム名", "運動会 得点", "後夜祭 得点", "総合得点"];
+            document.getElementById('overall-table').innerHTML = createSortedTable(overallScores, headers, 'total');
+        }
+        
+        function displaySportsDayResults(sportsScores) {
+            const tableData = new Map();
+            sportsScores.forEach((score, team) => tableData.set(team, { total: score }));
+            document.getElementById('sports-day-table').innerHTML = createSortedTable(tableData, ["チーム名", "得点"], 'total');
+        }
+
+        function displayAfterpartyResults(afterpartyResults) {
+            const rankData = new Map();
+            afterpartyResults.finalScores.forEach((score, team) => rankData.set(team, { total: score }));
+            document.getElementById('afterparty-rank-table').innerHTML = createSortedTable(rankData, ["チーム名", "合計得点"], 'total');
+
+            const container = document.getElementById('afterparty-awards-details');
+            container.innerHTML = '';
+            appData.afterpartyAwards.forEach(award => {
+                const awardVoteCounts = afterpartyResults.voteCounts.get(award);
+                const awardReasons = afterpartyResults.voteReasons.get(award);
+                
+                const awardScores = afterpartyResults.normalizedScores.get(award);
+                const sortedByAdjustedScore = [...awardScores.entries()].sort((a,b) => b[1] - a[1]);
+
+                let winnerTeams = ["該当なし"];
+                if (sortedByAdjustedScore.length > 0 && sortedByAdjustedScore[0][1] > 0) {
+                    const maxScore = sortedByAdjustedScore[0][1];
+                    winnerTeams = sortedByAdjustedScore.filter(([, score]) => Math.abs(score - maxScore) < 1e-9).map(([team]) => team);
+                }
+                const winnerNames = winnerTeams.join(', ');
+
+                let reasonsHtml = '';
+                if (winnerTeams[0] !== "該当なし") {
+                    winnerTeams.forEach(team => {
+                        const specificReasons = awardReasons.get(team) || [];
+                        if (specificReasons.length > 0) {
+                            reasonsHtml += `<h6>${team} への投票理由</h6>
+                                <ul class="reasons-list">${specificReasons.map(r => `<li>${r}</li>`).join('')}</ul>`;
+                        }
+                    });
+                }
+                if (reasonsHtml === '') reasonsHtml = '<p>投票理由はありませんでした。</p>';
+
+                let tableHtml = '<table class="result-table"><thead><tr><th>チーム</th><th>得票数</th><th>調整後の得点</th></tr></thead><tbody>';
+                awardVoteCounts.forEach((votes, team) => {
+                    const teamTotalNormalized = Array.from(afterpartyResults.normalizedScores.values()).map(m => m.get(team)).reduce((a, b) => a + b, 0);
+                    const awardWeight = teamTotalNormalized > 0 ? afterpartyResults.normalizedScores.get(award).get(team) / teamTotalNormalized : 0;
+                    const score = afterpartyResults.finalScores.get(team) * awardWeight;
+                    tableHtml += `<tr><td>${team}</td><td>${votes}</td><td>${(score || 0).toFixed(2)}</td></tr>`;
+                });
+                tableHtml += '</tbody></table>';
+
+                container.innerHTML += `<div class="award-card"><h4>${award}</h4><p><strong>1位:</strong> <span class="award-winner">${winnerNames}</span></p><h5>投票理由</h5>${reasonsHtml}<h5 style="margin-top:15px;">得点内訳</h5>${tableHtml}</div>`;
+            });
+        }
+        
+        function displayPersonalAwards(personalAwards) {
+            const container = document.getElementById('personal-awards-details');
+            container.innerHTML = '';
+            personalAwards.forEach((result, award) => {
+                 const winnerNames = result.winners.join(', ');
+                 
+                 let reasonsHtml = '';
+                 if (result.winners[0] !== "該当者なし") {
+                     result.winners.forEach(winner => {
+                         const specificReasons = result.reasons.get(winner) || [];
+                         if (specificReasons.length > 0) {
+                             reasonsHtml += `<h6>${winner} さんへの投票理由</h6>
+                                <ul class="reasons-list">${specificReasons.map(r => `<li>${r}</li>`).join('')}</ul>`;
+                         }
+                     });
+                 }
+                 if (reasonsHtml === '') reasonsHtml = '<p>投票理由はありませんでした。</p>';
+                 
+                 container.innerHTML += `<div class="award-card"><h4>${award}</h4><p><strong>受賞者:</strong> <span class="award-winner">${winnerNames}</span></p><h5>投票理由</h5>${reasonsHtml}</div>`;
+            });
+        }
+    </script>
+</body>
+</html>

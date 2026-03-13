@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>グループリスト作成</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 95%;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 30px;
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .controls {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            border-radius: 15px;
+            border: 1px solid #e0e6ed;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        label {
+            font-weight: 600;
+            color: #555;
+        }
+
+        button, input[type="file"] {
+            padding: 12px 25px;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        button {
+             position: relative;
+             overflow: hidden;
+        }
+        
+        button::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+            transition: left 0.5s ease;
+        }
+
+        button:hover::before {
+            left: 100%;
+        }
+        
+        button:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        .btn-secondary { background: linear-gradient(135deg, #ffecd2, #fcb69f); color: #333; }
+        .btn-success { background: linear-gradient(135deg, #28a745, #218838); color: white; }
+        .btn-danger { background: linear-gradient(135deg, #dc3545, #c82333); color: white; }
+        .btn-info { background: linear-gradient(135deg, #17a2b8, #138496); color: white; }
+
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 20px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            white-space: nowrap;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid #dee2e6;
+            vertical-align: middle;
+        }
+        
+        td.center-align {
+            text-align: center;
+        }
+
+        thead th {
+            background: linear-gradient(135deg, #f5f7fa, #c3cfe2);
+            color: #333;
+            font-weight: 700;
+            position: sticky;
+            top: 0;
+        }
+        
+        tbody tr:hover {
+            background-color: #f8f9fa;
+        }
+
+        td:first-child, th:first-child {
+            position: sticky;
+            left: 0;
+            background-color: white;
+            z-index: 1;
+        }
+        tbody tr:hover td:first-child {
+             background-color: #f8f9fa;
+        }
+
+        select {
+            padding: 8px 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            transition: all 0.3s ease;
+            background: white;
+            min-width: 100px;
+        }
+
+        select:focus {
+            border-color: #667eea;
+            outline: none;
+            box-shadow: 0 0 15px rgba(102, 126, 234, 0.2);
+        }
+        
+        .radio-group label {
+            margin-right: 10px;
+            font-weight: normal;
+        }
+        
+        input[type="checkbox"] {
+            transform: scale(1.5);
+            cursor: pointer;
+        }
+        
+        .message {
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .success { background: #d4edda; color: #155724; border: 2px solid #28a745; }
+        .error { background: #f8d7da; color: #721c24; border: 2px solid #dc3545; }
+        .info { background: #fff3cd; color: #856404; border: 2px solid #ffeeba; }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>グループリスト作成</h1>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="fileInput">名簿ファイル (.txt):</label>
+                <input type="file" id="fileInput" accept=".txt,.csv">
+                <button class="btn-primary" onclick="loadFile()">🔄 ファイル読み込み</button>
+            </div>
+            <button class="btn-secondary" onclick="addFactorColumn()">➕ 調整要因を追加</button>
+            <button class="btn-danger" onclick="removeFactorColumn()">➖ 調整要因を削除</button>
+            <button class="btn-success" onclick="exportToTxt()">💾 TXT形式で出力</button>
+        </div>
+
+        <div id="message"></div>
+
+        <div class="table-container" id="table-container">
+            </div>
+    </div>
+
+    <script>
+        let members = [];
+        let factorCount = 1;
+
+        function showMessage(message, type = 'success') {
+            const messageDiv = document.getElementById('message');
+            messageDiv.innerHTML = `<div class="message ${type}">${message}</div>`;
+            setTimeout(() => { messageDiv.innerHTML = ''; }, 4000);
+        }
+
+        function loadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) {
+                showMessage('ファイルを選択してください。', 'error');
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const text = e.target.result;
+                const lines = text.split(/\r?\n/).map(line => line.trim()).filter(line => line.length > 0);
+                
+                if (lines.length === 0) {
+                    showMessage('ファイルが空か、有効なデータが見つかりません。', 'error');
+                    return;
+                }
+
+                // ヘッダーを確認して、新規ファイルか編集済みファイルかを判定
+                const header = lines[0].split(',');
+                if (header[0] === '名簿' && header[1] === '参加形式') {
+                    // ★ 編集済みファイルの読み込み
+                    parseEditedData(lines);
+                } else {
+                    // ★ 新規ファイル（名前のみ）の読み込み
+                    parseNewData(lines);
+                }
+                
+                renderTable();
+            };
+            reader.onerror = () => showMessage('ファイルの読み込みに失敗しました。', 'error');
+            reader.readAsText(file, 'UTF-8');
+        }
+
+        function parseNewData(lines) {
+            members = lines.map(name => ({
+                name: name,
+                participation: 'both',
+                grade: 'それ以外',
+                gender: '',
+                factors: Array(1).fill(false)
+            }));
+            factorCount = 1;
+            showMessage(`新規名簿として${members.length}人を読み込みました。`, 'success');
+        }
+
+        function parseEditedData(lines) {
+            const header = lines.shift().split(',');
+            const newFactorCount = header.filter(h => h.startsWith('調整要因')).length;
+            factorCount = newFactorCount > 0 ? newFactorCount : 1;
+            
+            members = lines.map(line => {
+                const data = line.split(',');
+                const participationMap = {
+                    '両方参加': 'both', '運動会だけ参加': 'sports', '後夜祭だけ参加': 'party'
+                };
+
+                const factors = data.slice(4).map(f => f === '選択');
+                
+                return {
+                    name: data[0] || '',
+                    participation: participationMap[data[1]] || 'both',
+                    grade: data[2] || 'それ以外',
+                    gender: data[3] || '',
+                    factors: factors
+                };
+            });
+            showMessage(`編集済みデータ ${members.length}件を復元しました。`, 'success');
+        }
+
+        function renderTable() {
+            const container = document.getElementById('table-container');
+            if (members.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            let tableHTML = '<table>';
+            let header = '<thead><tr><th>名簿</th><th>参加形式</th><th>学年</th><th>性別</th>';
+            for (let i = 1; i <= factorCount; i++) {
+                header += `<th class="center-align">調整要因${i}</th>`;
+            }
+            header += '</tr></thead>';
+            tableHTML += header;
+
+            let body = '<tbody>';
+            members.forEach((member, index) => {
+                body += `<tr>`;
+                body += `<td>${member.name}</td>`;
+                
+                body += `<td>
+                    <div class="radio-group">
+                        <label><input type="radio" name="participation-${index}" value="both" onchange="updateMemberData(${index}, 'participation', this.value)" ${member.participation === 'both' ? 'checked' : ''}> 両方</label>
+                        <label><input type="radio" name="participation-${index}" value="sports" onchange="updateMemberData(${index}, 'participation', this.value)" ${member.participation === 'sports' ? 'checked' : ''}> 運動会のみ</label>
+                        <label><input type="radio" name="participation-${index}" value="party" onchange="updateMemberData(${index}, 'participation', this.value)" ${member.participation === 'party' ? 'checked' : ''}> 後夜祭のみ</label>
+                    </div>
+                </td>`;
+
+                body += `<td>
+                    <select onchange="updateMemberData(${index}, 'grade', this.value)">
+                        <option value="" ${!member.grade ? 'selected' : ''}>未選択</option>
+                        <option value="1年" ${member.grade === '1年' ? 'selected' : ''}>1年</option>
+                        <option value="それ以外" ${member.grade === 'それ以外' ? 'selected' : ''}>それ以外</option>
+                    </select>
+                </td>`;
+
+                body += `<td>
+                    <select onchange="updateMemberData(${index}, 'gender', this.value)">
+                        <option value="" ${!member.gender ? 'selected' : ''}>未選択</option>
+                        <option value="男" ${member.gender === '男' ? 'selected' : ''}>男</option>
+                        <option value="女" ${member.gender === '女' ? 'selected' : ''}>女</option>
+                    </select>
+                </td>`;
+
+                for (let i = 0; i < factorCount; i++) {
+                    body += `<td class="center-align"><input type="checkbox" onchange="updateMemberData(${index}, 'factor', this.checked, ${i})" ${member.factors[i] ? 'checked' : ''}></td>`;
+                }
+                body += `</tr>`;
+            });
+            body += '</tbody>';
+            tableHTML += body;
+            container.innerHTML = tableHTML;
+        }
+
+        function updateMemberData(memberIndex, field, value, factorIndex = null) {
+            if (field === 'factor') {
+                members[memberIndex].factors[factorIndex] = value;
+            } else {
+                members[memberIndex][field] = value;
+            }
+        }
+        
+        function addFactorColumn() {
+            if (members.length === 0) {
+                showMessage('先に名簿ファイルを読み込んでください。', 'error');
+                return;
+            }
+            factorCount++;
+            members.forEach(member => member.factors.push(false));
+            renderTable();
+            showMessage(`調整要因${factorCount}を追加しました。`, 'info');
+        }
+        
+        function removeFactorColumn() {
+            if (factorCount <= 1) {
+                showMessage('これ以上削除できません。', 'error');
+                return;
+            }
+            if (members.length === 0) {
+                 showMessage('先に名簿ファイルを読み込んでください。', 'error');
+                return;
+            }
+            factorCount--;
+            members.forEach(member => member.factors.pop());
+            renderTable();
+            showMessage(`最後の調整要因を削除しました。`, 'info');
+        }
+        
+        function exportToTxt() {
+            if (members.length === 0) {
+                showMessage('エクスポートするデータがありません。', 'error');
+                return;
+            }
+            
+            let header = ['名簿', '参加形式', '学年', '性別'];
+            for (let i = 1; i <= factorCount; i++) {
+                header.push(`調整要因${i}`);
+            }
+            let content = header.join(',') + '\r\n';
+
+            members.forEach(member => {
+                const participationText = {
+                    'both': '両方参加', 'sports': '運動会だけ参加', 'party': '後夜祭だけ参加'
+                }[member.participation] || '';
+                
+                const factorTexts = member.factors.map(isChecked => isChecked ? '選択' : '非選択');
+
+                let row = [
+                    member.name,
+                    participationText,
+                    member.grade,
+                    member.gender,
+                    ...factorTexts
+                ];
+                content += row.join(',') + '\r\n';
+            });
+            
+            const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = '名簿データ.txt';
+            link.click();
+            URL.revokeObjectURL(link.href);
+
+            showMessage('データをTXTファイルに出力しました。', 'success');
+        }
+    </script>
+</body>
+</html>
